@@ -2,13 +2,10 @@ package zetasqlfmt
 
 import (
 	"fmt"
-	"go/ast"
-	"go/importer"
-	"go/parser"
-	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/tools/go/packages"
 )
 
 func FindGoFiles(directory string, fn func(path string)) error {
@@ -37,30 +34,53 @@ type FormatResult struct {
 }
 
 func Format(path string) (*FormatResult, error) {
-	source, err := os.ReadFile(path)
+	// source, err := os.ReadFile(path)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to read file %s: %v", path, err)
+	// }
+	//
+	// fset := token.NewFileSet()
+	//
+	// f, err := parser.ParseFile(fset, path, source, parser.ParseComments)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to parse file %s: %v", path, err)
+	// }
+
+	cfg := &packages.Config{
+		Mode: packages.LoadAllSyntax,
+	}
+
+	pkgs, err := packages.Load(cfg, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %v", path, err)
+		return nil, fmt.Errorf("failed to load packages: %v", err)
+	}
+	if packages.PrintErrors(pkgs) > 0 {
+		return nil, fmt.Errorf("failed to load packages")
+	}
+	for _, pkg := range pkgs {
+		fmt.Println("@", pkg.TypesInfo.Uses)
+		fmt.Println("@", pkg.Types)
+		for k, v := range pkg.TypesInfo.Uses {
+			// fmt.Println("KEY", k.Name, "VALUE", v)
+			fmt.Println("KEY", k)
+			fmt.Println("VALUE", v.Name(), v.Type().Underlying())
+		}
 	}
 
-	fset := token.NewFileSet()
+	// conf := types.Config{Importer: importer.Default()}
 
-	f, err := parser.ParseFile(fset, path, source, parser.ParseComments)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse file %s: %v", path, err)
-	}
+	// info := &types.Info{
+	// 	Uses: make(map[*ast.Ident]types.Object),
+	// }
 
-	conf := types.Config{Importer: importer.Default()}
-
-	info := &types.Info{
-		Uses: make(map[*ast.Ident]types.Object),
-	}
-
-	pkg, err := conf.Check(path, fset, []*ast.File{f}, info)
-	if err != nil {
-		return nil, fmt.Errorf("failed to type check file %s: %v", path, err)
-	}
-
-	fmt.Println(pkg)
+	// o := f.Scope.Lookup("Statement")
+	// fmt.Println(o)
+	// pkg, err := conf.Check(path, fset, []*ast.File{f}, info)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to type check file %s: %v", path, err)
+	// }
+	//
+	// fmt.Println(pkg)
 
 	return nil, nil
 }
