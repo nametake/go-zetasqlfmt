@@ -2,6 +2,11 @@ package zetasqlfmt
 
 import (
 	"fmt"
+	"go/ast"
+	"go/importer"
+	"go/parser"
+	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 )
@@ -32,5 +37,30 @@ type FormatResult struct {
 }
 
 func Format(path string) (*FormatResult, error) {
+	source, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file %s: %v", path, err)
+	}
+
+	fset := token.NewFileSet()
+
+	f, err := parser.ParseFile(fset, path, source, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse file %s: %v", path, err)
+	}
+
+	conf := types.Config{Importer: importer.Default()}
+
+	info := &types.Info{
+		Uses: make(map[*ast.Ident]types.Object),
+	}
+
+	pkg, err := conf.Check(path, fset, []*ast.File{f}, info)
+	if err != nil {
+		return nil, fmt.Errorf("failed to type check file %s: %v", path, err)
+	}
+
+	fmt.Println(pkg)
+
 	return nil, nil
 }
