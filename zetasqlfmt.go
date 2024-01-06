@@ -24,5 +24,13 @@ func FindGoFiles(directory string, fn func(path string)) error {
 	}
 
 	return nil
+}
 
+type FormatResult struct {
+	Output  []byte
+	Changed bool
+}
+
+func Format(path string) (*FormatResult, error) {
+	return nil, nil
 }
