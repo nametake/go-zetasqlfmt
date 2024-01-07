@@ -37,7 +37,6 @@ func main() {
 }
 
 func run(dir string) error {
-	errMsgCh := make(chan *zetasqlfmt.FormatError)
 	waitGroup := sync.WaitGroup{}
 
 	cfg := &packages.Config{
@@ -48,8 +47,11 @@ func run(dir string) error {
 		return fmt.Errorf("failed to load packages: path = %s: %v", dir, err)
 	}
 
-	format := func(pkg *packages.Package, file *ast.File, ch chan *zetasqlfmt.FormatError, wg *sync.WaitGroup) {
-		defer wg.Done()
+	errCount := 0
+	format := func(pkg *packages.Package, file *ast.File, wg *sync.WaitGroup) {
+		defer func() {
+			wg.Done()
+		}()
 
 		result, err := zetasqlfmt.Format(pkg, file)
 		if err != nil {
@@ -59,7 +61,8 @@ func run(dir string) error {
 
 		if len(result.Errors) > 0 {
 			for _, err := range result.Errors {
-				ch <- err
+				errCount += 1
+				fmt.Fprintf(os.Stderr, "%v\n", err)
 			}
 		}
 		if !result.Changed {
@@ -75,23 +78,14 @@ func run(dir string) error {
 	for _, pkg := range pkgs {
 		for _, file := range pkg.Syntax {
 			waitGroup.Add(1)
-			go format(pkg, file, errMsgCh, &waitGroup)
+			go format(pkg, file, &waitGroup)
 		}
 	}
 
-	count := 0
-	go func() {
-		if err := <-errMsgCh; err != nil {
-			count += 1
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-		}
-	}()
-
 	waitGroup.Wait()
-	close(errMsgCh)
 
-	if count > 0 {
-		return fmt.Errorf("failed to format %d files", count)
+	if errCount > 0 {
+		return fmt.Errorf("failed to format %d files", errCount)
 	}
 
 	return nil
