@@ -36,7 +36,7 @@ func main() {
 
 func run(dir string) error {
 	errMsgCh := make(chan *zetasqlfmt.FormatError)
-	wg := &sync.WaitGroup{}
+	waitGroup := &sync.WaitGroup{}
 
 	fn := func(path string, ch chan *zetasqlfmt.FormatError, wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -46,33 +46,38 @@ func run(dir string) error {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
 		}
+
 		if len(result.Errors) > 0 {
 			for _, err := range result.Errors {
 				ch <- err
 			}
 		}
-		if result.Changed {
-			if err := os.WriteFile(path, result.Output, 0644); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-			}
+		if !result.Changed {
+			return
+		}
+
+		if err := os.WriteFile(path, result.Output, 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
 		}
 	}
 
 	if err := zetasqlfmt.FindGoFiles(dir, func(path string) {
-		wg.Add(1)
-		go fn(path, errMsgCh, wg)
+		waitGroup.Add(1)
+		go fn(path, errMsgCh, waitGroup)
 	}); err != nil {
 		return fmt.Errorf("failed to find go files: %v", err)
 	}
 
-	wg.Wait()
-	close(errMsgCh)
-
 	count := 0
-	if err := <-errMsgCh; err != nil {
-		count += 1
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-	}
+	go func() {
+		if err := <-errMsgCh; err != nil {
+			count += 1
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
+	}()
+
+	waitGroup.Wait()
+	close(errMsgCh)
 
 	if count > 0 {
 		return fmt.Errorf("failed to format %d files", count)
