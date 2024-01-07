@@ -94,12 +94,32 @@ func Format(path string) (*FormatResult, error) {
 			if key.Name != "SQL" {
 				continue
 			}
-			value, ok := elt.Value.(*ast.BasicLit)
-			if !ok {
-				continue
+
+			switch valueExpr := elt.Value.(type) {
+			case *ast.BasicLit:
+				basicLitExprs = append(basicLitExprs, valueExpr)
+			case *ast.CallExpr:
+				callExpr, ok := valueExpr.Fun.(*ast.SelectorExpr)
+				if !ok {
+					continue
+				}
+				fn, ok := pkg.TypesInfo.Uses[callExpr.Sel]
+				if fn.Pkg().Path() != "fmt" || fn.Name() != "Sprintf" {
+					continue
+				}
+				if len(valueExpr.Args) < 1 {
+					return true
+				}
+				argExpr := valueExpr.Args[0]
+				v, ok := argExpr.(*ast.BasicLit)
+				if !ok {
+					return true
+				}
+
+				basicLitExprs = append(basicLitExprs, v)
+			default:
 			}
 
-			basicLitExprs = append(basicLitExprs, value)
 		}
 		return true
 	})
@@ -115,14 +135,10 @@ func Format(path string) (*FormatResult, error) {
 		query := trimQuotes(basicLitExpr.Value)
 		query = fillFormatVerbs(query)
 
-		fmt.Println(query)
-
 		output, err := zetasql.FormatSQL(query)
 		if err != nil {
 			return nil, fmt.Errorf("%s: failed to format SQL: %v", path, err)
 		}
-
-		fmt.Println(output)
 
 		output = restoreFormatVerbs(output)
 		basicLitExpr.Value = wrapQuotes(output)
