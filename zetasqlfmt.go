@@ -6,38 +6,12 @@ import (
 	"go/ast"
 	"go/format"
 	"go/printer"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/goccy/go-zetasql"
 	"golang.org/x/tools/go/packages"
 )
-
-func FindGoFiles(directory string, fn func(path string)) error {
-	if err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			switch info.Name() {
-			case "testdata", "vendor":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if filepath.Ext(path) != ".go" {
-			return nil
-		}
-		if strings.HasSuffix(path, "_gen.go") {
-			return nil
-		}
-		fn(path)
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to walk directory %s: %v", directory, err)
-	}
-
-	return nil
-}
 
 type FormatError struct {
 	Message string
@@ -176,7 +150,6 @@ func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
 		Changed: true,
 	}, nil
 }
-
 func trimQuotes(s string) string {
 	if len(s) < 2 {
 		return s
