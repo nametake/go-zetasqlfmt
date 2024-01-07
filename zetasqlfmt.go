@@ -34,8 +34,18 @@ func FindGoFiles(directory string, fn func(path string)) error {
 	return nil
 }
 
+type FormatError struct {
+	Message string
+	PosText string
+}
+
+func (e *FormatError) String() string {
+	return fmt.Sprintf("%s:\n%s", e.PosText, e.Message)
+}
+
 type FormatResult struct {
 	Output  []byte
+	Errors  []*FormatError
 	Changed bool
 }
 
@@ -104,6 +114,9 @@ func Format(path string) (*FormatResult, error) {
 					continue
 				}
 				fn, ok := pkg.TypesInfo.Uses[callExpr.Sel]
+				if !ok {
+					continue
+				}
 				if fn.Pkg().Path() != "fmt" || fn.Name() != "Sprintf" {
 					continue
 				}
@@ -124,6 +137,7 @@ func Format(path string) (*FormatResult, error) {
 		return true
 	})
 
+	errors := make([]*FormatError, 0, len(basicLitExprs))
 	if len(basicLitExprs) == 0 {
 		return &FormatResult{
 			Output:  nil,
@@ -137,11 +151,23 @@ func Format(path string) (*FormatResult, error) {
 
 		output, err := zetasql.FormatSQL(query)
 		if err != nil {
-			return nil, fmt.Errorf("%s: failed to format SQL: %v", path, err)
+			errors = append(errors, &FormatError{
+				Message: err.Error(),
+				PosText: pkg.Fset.Position(basicLitExpr.Pos()).String(),
+			})
+			continue
 		}
 
 		output = restoreFormatVerbs(output)
 		basicLitExpr.Value = wrapQuotes(output)
+	}
+
+	if len(errors) == len(basicLitExprs) {
+		return &FormatResult{
+			Output:  nil,
+			Errors:  errors,
+			Changed: false,
+		}, nil
 	}
 
 	var buf bytes.Buffer

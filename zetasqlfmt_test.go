@@ -2,6 +2,7 @@ package zetasqlfmt
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -54,6 +55,24 @@ func TestFormat(t *testing.T) {
 			},
 		},
 		{
+			filePath:   "invalid_sql.go",
+			goldenFile: "",
+			want: &FormatResult{
+				Errors: []*FormatError{
+					{
+						Message: `INVALID_ARGUMENT: Syntax error: Expected end of input but got identifier "FROM_TABLE" [at 1:10]
+SELECT * FROM_TABLE;
+         ^
+Syntax error: Unexpected end of statement [at 1:21]
+SELECT * FROM_TABLE;
+                    ^`,
+						PosText: "invalid_sql.go:9:11",
+					},
+				},
+				Changed: false,
+			},
+		},
+		{
 			filePath:   "no_sql.go",
 			goldenFile: "",
 			want: &FormatResult{
@@ -61,6 +80,13 @@ func TestFormat(t *testing.T) {
 			},
 		},
 	}
+
+	opt := cmp.Comparer(func(x, y *FormatError) bool {
+		if len(x.PosText) < len(y.PosText) {
+			return x.Message == y.Message && strings.HasSuffix(y.PosText, x.PosText)
+		}
+		return x.Message == y.Message && strings.HasSuffix(x.PosText, y.PosText)
+	})
 
 	for _, test := range tests {
 		if test.want.Changed {
@@ -77,7 +103,7 @@ func TestFormat(t *testing.T) {
 			continue
 		}
 
-		if diff := cmp.Diff(test.want, got); diff != "" {
+		if diff := cmp.Diff(test.want, got, opt); diff != "" {
 			t.Errorf("Format(%q) returned unexpected result (-want +got):\n%s", test.filePath, diff)
 		}
 	}
