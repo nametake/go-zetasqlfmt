@@ -55,7 +55,7 @@ type FormatResult struct {
 	Changed bool
 }
 
-func Forma(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
+func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
 	basicLitExprs := make([]*ast.BasicLit, 0)
 	ast.Inspect(file, func(n ast.Node) bool {
 		compositeLit, ok := n.(*ast.CompositeLit)
