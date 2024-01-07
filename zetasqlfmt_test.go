@@ -1,11 +1,13 @@
 package zetasqlfmt
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/tools/go/packages"
 )
 
 func TestFindGoFiles(t *testing.T) {
@@ -26,6 +28,35 @@ func TestFindGoFiles(t *testing.T) {
 
 	if diff := cmp.Diff(expected, actuals); diff != "" {
 		t.Errorf("FindGoFiles(%q) returned unexpected files (-want +got):\n%s", "testdata", diff)
+	}
+}
+
+func TestSample(t *testing.T) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir("testdata"); err != nil {
+		t.Fatalf("failed to change directory to testdata: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatalf("failed to change directory to %q: %v", currentDir, err)
+		}
+	})
+
+	cfg := &packages.Config{
+		Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedFiles,
+	}
+
+	pkgs, err := packages.Load(cfg, "./...")
+	if err != nil {
+		t.Fatalf("failed to load packages: %v", err)
+	}
+	fmt.Println(pkgs)
+
+	for _, pkg := range pkgs {
+		fmt.Println(pkg.GoFiles)
 	}
 }
 
