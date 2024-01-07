@@ -60,7 +60,7 @@ func TestSample(t *testing.T) {
 	}
 }
 
-func TestFormat(t *testing.T) {
+func TestFormatOld(t *testing.T) {
 	// for cloud.google.com/go/spanner module
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -174,14 +174,14 @@ SELECT * FROM_TABLE;
 			test.want.Output = golden
 		}
 
-		got, err := Format(test.filePath)
+		got, err := FormatOld(test.filePath)
 		if err != nil {
-			t.Errorf("Format(%q) returned unexpected error: %v", test.filePath, err)
+			t.Errorf("FormatOld(%q) returned unexpected error: %v", test.filePath, err)
 			continue
 		}
 
 		if diff := cmp.Diff(test.want, got, opt); diff != "" {
-			t.Errorf("Format(%q) returned unexpected result (-want +got):\n%s", test.filePath, diff)
+			t.Errorf("FormatOld(%q) returned unexpected result (-want +got):\n%s", test.filePath, diff)
 		}
 	}
 }

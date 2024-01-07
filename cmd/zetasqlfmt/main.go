@@ -41,7 +41,7 @@ func run(dir string) error {
 	fn := func(path string, ch chan *zetasqlfmt.FormatError, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		result, err := zetasqlfmt.Format(path)
+		result, err := zetasqlfmt.FormatOld(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)

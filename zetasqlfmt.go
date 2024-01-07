@@ -49,12 +49,131 @@ func (e *FormatError) String() string {
 }
 
 type FormatResult struct {
+	Path    string
 	Output  []byte
 	Errors  []*FormatError
 	Changed bool
 }
 
-func Format(path string) (*FormatResult, error) {
+func Forma(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
+	basicLitExprs := make([]*ast.BasicLit, 0)
+	ast.Inspect(file, func(n ast.Node) bool {
+		compositeLit, ok := n.(*ast.CompositeLit)
+		if !ok {
+			return true
+		}
+
+		selectorExpr, ok := compositeLit.Type.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		use, ok := pkg.TypesInfo.Uses[selectorExpr.Sel]
+		if !ok {
+			return true
+		}
+
+		if use.Type().String() != "cloud.google.com/go/spanner.Statement" {
+			return true
+		}
+
+		for _, elt := range compositeLit.Elts {
+			elt, ok := elt.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			key, ok := elt.Key.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			if key.Name != "SQL" {
+				continue
+			}
+
+			switch valueExpr := elt.Value.(type) {
+			case *ast.BasicLit:
+				basicLitExprs = append(basicLitExprs, valueExpr)
+			case *ast.CallExpr:
+				callExpr, ok := valueExpr.Fun.(*ast.SelectorExpr)
+				if !ok {
+					continue
+				}
+				fn, ok := pkg.TypesInfo.Uses[callExpr.Sel]
+				if !ok {
+					continue
+				}
+				if fn.Pkg().Path() != "fmt" || fn.Name() != "Sprintf" {
+					continue
+				}
+				if len(valueExpr.Args) < 1 {
+					return true
+				}
+				argExpr := valueExpr.Args[0]
+				v, ok := argExpr.(*ast.BasicLit)
+				if !ok {
+					return true
+				}
+
+				basicLitExprs = append(basicLitExprs, v)
+			default:
+			}
+
+		}
+		return true
+	})
+
+	errors := make([]*FormatError, 0, len(basicLitExprs))
+	if len(basicLitExprs) == 0 {
+		return &FormatResult{
+			Output:  nil,
+			Errors:  errors,
+			Changed: false,
+		}, nil
+	}
+
+	for _, basicLitExpr := range basicLitExprs {
+		query := trimQuotes(basicLitExpr.Value)
+		query = fillFormatVerbs(query)
+
+		output, err := zetasql.FormatSQL(query)
+		if err != nil {
+			errors = append(errors, &FormatError{
+				Message: err.Error(),
+				PosText: pkg.Fset.Position(basicLitExpr.Pos()).String(),
+			})
+			continue
+		}
+
+		output = restoreFormatVerbs(output)
+		basicLitExpr.Value = wrapQuotes(output)
+	}
+
+	if len(errors) == len(basicLitExprs) {
+		return &FormatResult{
+			Output:  nil,
+			Errors:  errors,
+			Changed: false,
+		}, nil
+	}
+
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, pkg.Fset, file); err != nil {
+		return nil, fmt.Errorf("%s: failed to print AST: %v", pkg.Fset.Position(file.Pos()), err)
+	}
+
+	result, err := format.Source(buf.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to format source: %v", pkg.Fset.Position(file.Pos()), err)
+	}
+
+	return &FormatResult{
+		Output:  result,
+		Errors:  errors,
+		Changed: true,
+	}, nil
+}
+
+func FormatOld(path string) (*FormatResult, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
 	}
