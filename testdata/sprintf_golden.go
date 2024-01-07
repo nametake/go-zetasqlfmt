@@ -1,16 +1,20 @@
 package testdata
 
 import (
+	"fmt"
+
 	"cloud.google.com/go/spanner"
 )
 
 func Foo() *spanner.Statement {
 	return &spanner.Statement{
-		SQL: `
+		SQL: fmt.Sprintf(`
 SELECT
   *
 FROM
-  TABLE;
-`, Params: map[string]interface{}{},
+  TABLE
+ORDER BY %s;
+`, "CreatedAt"),
+		Params: map[string]interface{}{},
 	}
 }
