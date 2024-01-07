@@ -56,6 +56,7 @@ type FormatResult struct {
 }
 
 func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
+	path := pkg.Fset.Position(file.Pos()).Filename
 	basicLitExprs := make([]*ast.BasicLit, 0)
 	ast.Inspect(file, func(n ast.Node) bool {
 		compositeLit, ok := n.(*ast.CompositeLit)
@@ -125,6 +126,7 @@ func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
 	errors := make([]*FormatError, 0, len(basicLitExprs))
 	if len(basicLitExprs) == 0 {
 		return &FormatResult{
+			Path:    path,
 			Output:  nil,
 			Errors:  errors,
 			Changed: false,
@@ -150,6 +152,7 @@ func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
 
 	if len(errors) == len(basicLitExprs) {
 		return &FormatResult{
+			Path:    path,
 			Output:  nil,
 			Errors:  errors,
 			Changed: false,
@@ -167,6 +170,7 @@ func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
 	}
 
 	return &FormatResult{
+		Path:    path,
 		Output:  result,
 		Errors:  errors,
 		Changed: true,

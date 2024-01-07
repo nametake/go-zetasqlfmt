@@ -75,6 +75,15 @@ func TestFormat(t *testing.T) {
 		}
 	})
 
+	testdataDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+
+	addDirPrefix := func(s string) string {
+		return fmt.Sprintf("%s/%s", testdataDir, s)
+	}
+
 	tests := []struct {
 		filePath   string
 		goldenFile string
@@ -84,6 +93,7 @@ func TestFormat(t *testing.T) {
 			filePath:   "simple.go",
 			goldenFile: "simple_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("simple.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -92,6 +102,7 @@ func TestFormat(t *testing.T) {
 			filePath:   "sprintf.go",
 			goldenFile: "sprintf_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("sprintf.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -100,6 +111,7 @@ func TestFormat(t *testing.T) {
 			filePath:   "backquote.go",
 			goldenFile: "backquote_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("backquote.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -108,16 +120,17 @@ func TestFormat(t *testing.T) {
 			filePath:   "invalid_sql.go",
 			goldenFile: "",
 			want: &FormatResult{
+				Path:    addDirPrefix("invalid_sql.go"),
 				Changed: false,
 				Errors: []*FormatError{
 					{
 						Message: `INVALID_ARGUMENT: Syntax error: Expected end of input but got identifier "FROM_TABLE" [at 1:10]
-SELECT * FROM_TABLE
+SELECT * FROM_TABLE;
          ^
 Syntax error: Unexpected end of statement [at 1:21]
 SELECT * FROM_TABLE;
                     ^`,
-						PosText: "invalid_sql.go:9:11",
+						PosText: addDirPrefix("invalid_sql.go:9:11"),
 					},
 				},
 			},
@@ -126,6 +139,7 @@ SELECT * FROM_TABLE;
 			filePath:   "include_invalid_sql.go",
 			goldenFile: "include_invalid_sql_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("include_invalid_sql.go"),
 				Changed: true,
 				Errors: []*FormatError{
 					{
@@ -135,7 +149,7 @@ SELECT * FROM_TABLE;
 Syntax error: Unexpected end of statement [at 1:21]
 SELECT * FROM_TABLE;
                     ^`,
-						PosText: "include_invalid_sql.go:9:11",
+						PosText: addDirPrefix("include_invalid_sql.go:9:11"),
 					},
 				},
 			},
@@ -144,6 +158,7 @@ SELECT * FROM_TABLE;
 			filePath:   "undefined_type.go",
 			goldenFile: "undefined_type_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("undefined_type.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -152,18 +167,12 @@ SELECT * FROM_TABLE;
 			filePath:   "no_sql.go",
 			goldenFile: "",
 			want: &FormatResult{
+				Path:    addDirPrefix("no_sql.go"),
 				Changed: false,
 				Errors:  []*FormatError{},
 			},
 		},
 	}
-
-	opt := cmp.Comparer(func(x, y *FormatError) bool {
-		if len(x.PosText) < len(y.PosText) {
-			return x.Message == y.Message && strings.HasSuffix(y.PosText, x.PosText)
-		}
-		return x.Message == y.Message && strings.HasSuffix(x.PosText, y.PosText)
-	})
 
 	for _, test := range tests {
 		if test.want.Changed {
@@ -175,7 +184,7 @@ SELECT * FROM_TABLE;
 		}
 
 		cfg := &packages.Config{
-			Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
+			Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedFiles,
 		}
 		pkgs, err := packages.Load(cfg, test.filePath)
 		if err != nil {
@@ -199,7 +208,7 @@ SELECT * FROM_TABLE;
 			continue
 		}
 
-		if diff := cmp.Diff(test.want, got, opt); diff != "" {
+		if diff := cmp.Diff(test.want, got); diff != "" {
 			t.Errorf("Format(%q) returned unexpected result (-want +got):\n%s", test.filePath, diff)
 		}
 	}
