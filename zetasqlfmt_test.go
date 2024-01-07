@@ -57,6 +57,14 @@ func TestFormat(t *testing.T) {
 			},
 		},
 		{
+			filePath:   "backquote.go",
+			goldenFile: "backquote_golden.go",
+			want: &FormatResult{
+				Changed: true,
+				Errors:  []*FormatError{},
+			},
+		},
+		{
 			filePath:   "invalid_sql.go",
 			goldenFile: "",
 			want: &FormatResult{

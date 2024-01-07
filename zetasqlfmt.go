@@ -8,6 +8,7 @@ import (
 	"go/printer"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/goccy/go-zetasql"
@@ -199,7 +200,9 @@ func trimQuotes(s string) string {
 }
 
 func wrapQuotes(s string) string {
-	if strings.Contains(s, "\n") {
+	if strings.Contains(s, "`") {
+		return fmt.Sprintf("\"%s\"", removeNewlines(s))
+	} else if strings.Contains(s, "\n") {
 		return fmt.Sprintf("`\n%s\n`", s)
 	}
 	return fmt.Sprintf("\"%s\"", s)
@@ -232,4 +235,14 @@ func restoreFormatVerbs(sql string) string {
 	sql = strings.ReplaceAll(sql, "_DUMMY_VALUE_", "%v")
 	sql = strings.ReplaceAll(sql, "_DUMMY_STRING_", "%s")
 	return sql
+}
+
+func removeNewlines(input string) string {
+	// remove multiple spaces
+	re := regexp.MustCompile(`\s{2,}`)
+	result := re.ReplaceAllString(input, " ")
+	// remove newlines
+	result = strings.ReplaceAll(result, "\n", " ")
+	result = strings.TrimSpace(result)
+	return result
 }
