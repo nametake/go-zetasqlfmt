@@ -18,12 +18,16 @@ import (
 func FindGoFiles(directory string, fn func(path string)) error {
 	if err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
-			if info.Name() == "testdata" {
+			switch info.Name() {
+			case "testdata", "vendor":
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if filepath.Ext(path) != ".go" {
+			return nil
+		}
+		if strings.HasSuffix(path, "_gen.go") {
 			return nil
 		}
 		fn(path)

@@ -31,9 +31,18 @@ func TestFindGoFiles(t *testing.T) {
 
 func TestFormat(t *testing.T) {
 	// for cloud.google.com/go/spanner module
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
 	if err := os.Chdir("testdata"); err != nil {
 		t.Fatalf("failed to change directory to testdata: %v", err)
 	}
+	t.Cleanup(func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatalf("failed to change directory to %q: %v", currentDir, err)
+		}
+	})
 
 	tests := []struct {
 		filePath   string
