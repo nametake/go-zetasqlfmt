@@ -104,14 +104,27 @@ func Format(path string) (*FormatResult, error) {
 		return true
 	})
 
+	if len(basicLitExprs) == 0 {
+		return &FormatResult{
+			Output:  []byte{},
+			Changed: false,
+		}, nil
+	}
+
 	for _, basicLitExpr := range basicLitExprs {
 		query := trimQuotes(basicLitExpr.Value)
+		query = fillFormatVerbs(query)
+
+		fmt.Println(query)
 
 		output, err := zetasql.FormatSQL(query)
 		if err != nil {
 			return nil, fmt.Errorf("%s: failed to format SQL: %v", path, err)
 		}
 
+		fmt.Println(output)
+
+		output = restoreFormatVerbs(output)
 		basicLitExpr.Value = wrapQuotes(output)
 	}
 
@@ -146,5 +159,33 @@ func wrapQuotes(s string) string {
 		return fmt.Sprintf("`\n%s\n`", s)
 	}
 	return fmt.Sprintf("\"%s\"", s)
+}
 
+func fillFormatVerbs(sql string) string {
+	dummyValues := make([]any, 0)
+	isVerb := false
+	for _, char := range sql {
+		if char == '%' {
+			isVerb = true
+		} else if isVerb {
+			switch char {
+			case 'd':
+				dummyValues = append(dummyValues, -999)
+			case 'v':
+				dummyValues = append(dummyValues, "_DUMMY_VALUE_")
+			case 's':
+				dummyValues = append(dummyValues, "_DUMMY_STRING_")
+			}
+			isVerb = false
+		}
+	}
+
+	return fmt.Sprintf(sql, dummyValues...)
+}
+
+func restoreFormatVerbs(sql string) string {
+	sql = strings.ReplaceAll(sql, "-999", "%d")
+	sql = strings.ReplaceAll(sql, "_DUMMY_VALUE_", "%v")
+	sql = strings.ReplaceAll(sql, "_DUMMY_STRING_", "%s")
+	return sql
 }
