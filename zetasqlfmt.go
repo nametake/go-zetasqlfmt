@@ -1,8 +1,11 @@
 package zetasqlfmt
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
+	"go/printer"
 	"os"
 	"path/filepath"
 
@@ -35,18 +38,6 @@ type FormatResult struct {
 }
 
 func Format(path string) (*FormatResult, error) {
-	// source, err := os.ReadFile(path)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to read file %s: %v", path, err)
-	// }
-	//
-	// fset := token.NewFileSet()
-	//
-	// f, err := parser.ParseFile(fset, path, source, parser.ParseComments)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to parse file %s: %v", path, err)
-	// }
-
 	cfg := &packages.Config{
 		Mode: packages.LoadAllSyntax,
 	}
@@ -63,57 +54,66 @@ func Format(path string) (*FormatResult, error) {
 	}
 
 	pkg := pkgs[0]
-	fmt.Println(pkg.Name)
-	// fmt.Printf("%+v\n\n", pkg.TypesInfo.Uses)
-	// fmt.Printf("%+v\n\n", pkg.TypesInfo.Types)
-	// fmt.Printf("%+v\n\n", pkg.TypesInfo.Defs)
-	// fmt.Printf("%+v\n\n", pkg.TypesInfo.Scopes)
-	fmt.Printf("%+v\n\n", pkg.Syntax)
-	for i, f := range pkg.TypesInfo.Uses {
-		fmt.Println("------")
-		if f.Type().String() == "cloud.google.com/go/spanner.Statement" {
-			fmt.Println("@@@@@@@")
-			fmt.Println(i)
-		}
+	if len(pkg.Syntax) != 1 {
+		return nil, fmt.Errorf("expected exactly one file")
 	}
-	for _, f := range pkg.Syntax {
-		ast.Inspect(f, func(n ast.Node) bool {
-			// fmt.Printf("%+v\n", n)
-			switch n := n.(type) {
-			case *ast.CompositeLit:
-				fmt.Println("AAAAAAAAAAAAAAAAAAAAAA")
-				sel, ok := n.Type.(*ast.SelectorExpr)
-				if !ok {
-					return true
-				}
-				fmt.Println(pkg.TypesInfo.Uses[sel.Sel])
-				x, ok := sel.X.(*ast.Ident)
-				if !ok {
-					return true
-				}
-				fmt.Println(pkg.TypesInfo.Uses[x])
-				fmt.Println("BBBBBBBBBBBBBBBBBbb")
+	file := pkg.Syntax[0]
 
-			case *ast.Ident:
-				//	 fmt.Println("------")
-				use, ok := pkg.TypesInfo.Uses[n]
-				if !ok {
-					return true
-				}
-				if use.Type().String() == "cloud.google.com/go/spanner.Statement" {
-					fmt.Println("@@@@@@@")
-					fmt.Println(n.Name)
-					fmt.Println("1111111111", use)
-				}
-				// fmt.Println(n.Name)
-				// fmt.Println("3333333333", pkg.TypesInfo.Uses[n])
-				// case ast.Expr:
-				//	 fmt.Println("------")
-				//	 fmt.Println(pkg.TypesInfo.Types[n])
-			}
+	basicLitExprs := make([]*ast.BasicLit, 0)
+	ast.Inspect(file, func(n ast.Node) bool {
+		compositeLit, ok := n.(*ast.CompositeLit)
+		if !ok {
 			return true
-		})
+		}
+
+		selectorExpr, ok := compositeLit.Type.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+
+		use, ok := pkg.TypesInfo.Uses[selectorExpr.Sel]
+		if !ok {
+			return true
+		}
+
+		if use.Type().String() != "cloud.google.com/go/spanner.Statement" {
+			return true
+		}
+
+		for _, elt := range compositeLit.Elts {
+			elt, ok := elt.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			key, ok := elt.Key.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			if key.Name != "SQL" {
+				continue
+			}
+			value, ok := elt.Value.(*ast.BasicLit)
+			if !ok {
+				continue
+			}
+
+			basicLitExprs = append(basicLitExprs, value)
+		}
+		return true
+	})
+
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, pkg.Fset, file); err != nil {
+		return nil, fmt.Errorf("%s: failed to print AST: %v", path, err)
 	}
 
-	return nil, nil
+	result, err := format.Source(buf.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("%s: failed to format source: %v", path, err)
+	}
+
+	return &FormatResult{
+		Output:  result,
+		Changed: true,
+	}, nil
 }
