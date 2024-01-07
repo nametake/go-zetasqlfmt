@@ -8,7 +8,9 @@ import (
 	"go/printer"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/goccy/go-zetasql"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -102,6 +104,17 @@ func Format(path string) (*FormatResult, error) {
 		return true
 	})
 
+	for _, basicLitExpr := range basicLitExprs {
+		query := trimQuotes(basicLitExpr.Value)
+
+		output, err := zetasql.FormatSQL(query)
+		if err != nil {
+			return nil, fmt.Errorf("%s: failed to format SQL: %v", path, err)
+		}
+
+		basicLitExpr.Value = wrapQuotes(output)
+	}
+
 	var buf bytes.Buffer
 	if err := printer.Fprint(&buf, pkg.Fset, file); err != nil {
 		return nil, fmt.Errorf("%s: failed to print AST: %v", path, err)
@@ -116,4 +129,22 @@ func Format(path string) (*FormatResult, error) {
 		Output:  result,
 		Changed: true,
 	}, nil
+}
+
+func trimQuotes(s string) string {
+	if len(s) < 2 {
+		return s
+	}
+	if (s[0] != '"' && s[0] != '`') || (s[len(s)-1] != '"' && s[len(s)-1] != '`') {
+		return s
+	}
+	return s[1 : len(s)-1]
+}
+
+func wrapQuotes(s string) string {
+	if strings.Contains(s, "\n") {
+		return fmt.Sprintf("`\n%s\n`", s)
+	}
+	return fmt.Sprintf("\"%s\"", s)
+
 }

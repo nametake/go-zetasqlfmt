@@ -7,4 +7,7 @@ require (
 	golang.org/x/tools v0.16.1
 )
 
-require golang.org/x/mod v0.14.0 // indirect
+require (
+	github.com/goccy/go-zetasql v0.5.5 // indirect
+	golang.org/x/mod v0.14.0 // indirect
+)

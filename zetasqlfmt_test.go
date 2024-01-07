@@ -68,3 +68,28 @@ func TestFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestTrimQuotes(t *testing.T) {
+	tests := []struct {
+		arg  string
+		want string
+	}{
+		{
+			arg:  `"SELECT * FROM TABLE_A;"`,
+			want: `SELECT * FROM TABLE_A;`,
+		},
+		{
+			arg:  "`SELECT * FROM TABLE_A;`",
+			want: `SELECT * FROM TABLE_A;`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.arg, func(t *testing.T) {
+			got := trimQuotes(test.arg)
+			if got != test.want {
+				t.Errorf("trimQuotes(%q) = %q, want %q", test.arg, got, test.want)
+			}
+		})
+	}
+}

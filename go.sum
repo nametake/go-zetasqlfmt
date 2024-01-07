@@ -1,3 +1,5 @@
+github.com/goccy/go-zetasql v0.5.5 h1:3JpXt3p2533rnZMu09upCcI7YJ2KfjKgdo2Lu0xo+fU=
+github.com/goccy/go-zetasql v0.5.5/go.mod h1:xvvooX2RG404vnbdFZuAM8bTFksYwVUlqeIUrUNuo40=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 golang.org/x/mod v0.14.0 h1:dGoOF9QVLYng8IHTm7BAyWqCqSheQ5pYWGhzW00YJr0=
