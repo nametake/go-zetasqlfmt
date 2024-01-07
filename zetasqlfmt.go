@@ -57,19 +57,30 @@ func Format(path string) (*FormatResult, error) {
 
 	pkgs, err := packages.Load(cfg, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load packages: %v", err)
+		return nil, fmt.Errorf("failed to load packages: path = %s: %v", path, err)
 	}
-	if packages.PrintErrors(pkgs) > 0 {
-		return nil, fmt.Errorf("failed to load packages")
-	}
+	// NOTE If the package has syntax errors, it will be ignored.
+	// if packages.PrintErrors(pkgs) > 0 {
+	// 	return nil, fmt.Errorf("failed to load packages: path = %s: %v", path, err)
+	// }
 	if len(pkgs) != 1 {
-		return nil, fmt.Errorf("expected exactly one package")
+		return nil, fmt.Errorf("expected exactly one package: %s", path)
 	}
 
 	pkg := pkgs[0]
+
 	if len(pkg.Syntax) != 1 {
-		return nil, fmt.Errorf("expected exactly one file")
+		// for test.go file
+		if len(pkg.Syntax) == 0 {
+			return &FormatResult{
+				Output:  []byte{},
+				Errors:  []*FormatError{},
+				Changed: false,
+			}, nil
+		}
+		return nil, fmt.Errorf("expected exactly one file: %s", path)
 	}
+
 	file := pkg.Syntax[0]
 
 	basicLitExprs := make([]*ast.BasicLit, 0)
