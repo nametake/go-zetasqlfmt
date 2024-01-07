@@ -126,7 +126,7 @@ func Format(path string) (*FormatResult, error) {
 
 	if len(basicLitExprs) == 0 {
 		return &FormatResult{
-			Output:  []byte{},
+			Output:  nil,
 			Changed: false,
 		}, nil
 	}

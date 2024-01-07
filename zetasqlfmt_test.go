@@ -53,14 +53,21 @@ func TestFormat(t *testing.T) {
 				Changed: true,
 			},
 		},
+		{
+			filePath:   "no_sql.go",
+			goldenFile: "",
+			want: &FormatResult{
+				Changed: false,
+			},
+		},
 	}
 
 	for _, test := range tests {
-		golden, err := os.ReadFile(test.goldenFile)
-		if err != nil {
-			t.Errorf("failed to read golden file %q: %v", test.goldenFile, err)
-		}
 		if test.want.Changed {
+			golden, err := os.ReadFile(test.goldenFile)
+			if err != nil {
+				t.Errorf("failed to read golden file %q: %v", test.goldenFile, err)
+			}
 			test.want.Output = golden
 		}
 
