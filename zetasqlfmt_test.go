@@ -29,14 +29,19 @@ func TestFindGoFiles(t *testing.T) {
 }
 
 func TestFormat(t *testing.T) {
+	// for cloud.google.com/go/spanner module
+	if err := os.Chdir("testdata"); err != nil {
+		t.Fatalf("failed to change directory to testdata: %v", err)
+	}
+
 	tests := []struct {
 		filePath   string
 		goldenFile string
 		want       *FormatResult
 	}{
 		{
-			filePath:   "testdata/simple.go",
-			goldenFile: "testdata/simple_golden.go",
+			filePath:   "simple.go",
+			goldenFile: "simple_golden.go",
 			want: &FormatResult{
 				Changed: true,
 			},

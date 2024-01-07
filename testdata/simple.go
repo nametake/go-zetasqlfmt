@@ -1,4 +1,4 @@
-package simple
+package testdata
 
 import (
 	"cloud.google.com/go/spanner"
