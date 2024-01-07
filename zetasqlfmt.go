@@ -141,6 +141,7 @@ func Format(path string) (*FormatResult, error) {
 	if len(basicLitExprs) == 0 {
 		return &FormatResult{
 			Output:  nil,
+			Errors:  errors,
 			Changed: false,
 		}, nil
 	}
@@ -182,6 +183,7 @@ func Format(path string) (*FormatResult, error) {
 
 	return &FormatResult{
 		Output:  result,
+		Errors:  errors,
 		Changed: true,
 	}, nil
 }
