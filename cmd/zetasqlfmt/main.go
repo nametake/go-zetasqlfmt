@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go/ast"
 	"os"
 	"sync"
 
 	"github.com/nametake/go-zetasqlfmt"
+	"golang.org/x/tools/go/packages"
 )
 
 func init() {
@@ -36,12 +38,20 @@ func main() {
 
 func run(dir string) error {
 	errMsgCh := make(chan *zetasqlfmt.FormatError)
-	waitGroup := &sync.WaitGroup{}
+	waitGroup := sync.WaitGroup{}
 
-	fn := func(path string, ch chan *zetasqlfmt.FormatError, wg *sync.WaitGroup) {
+	cfg := &packages.Config{
+		Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedFiles,
+	}
+	pkgs, err := packages.Load(cfg, dir)
+	if err != nil {
+		return fmt.Errorf("failed to load packages: path = %s: %v", dir, err)
+	}
+
+	format := func(pkg *packages.Package, file *ast.File, ch chan *zetasqlfmt.FormatError, wg *sync.WaitGroup) {
 		defer wg.Done()
 
-		result, err := zetasqlfmt.FormatOld(path)
+		result, err := zetasqlfmt.Format(pkg, file)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
@@ -56,16 +66,17 @@ func run(dir string) error {
 			return
 		}
 
-		if err := os.WriteFile(path, result.Output, 0644); err != nil {
+		if err := os.WriteFile(result.Path, result.Output, 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
 		}
 	}
 
-	if err := zetasqlfmt.FindGoFiles(dir, func(path string) {
-		waitGroup.Add(1)
-		go fn(path, errMsgCh, waitGroup)
-	}); err != nil {
-		return fmt.Errorf("failed to find go files: %v", err)
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Syntax {
+			waitGroup.Add(1)
+			go format(pkg, file, errMsgCh, &waitGroup)
+		}
 	}
 
 	count := 0
