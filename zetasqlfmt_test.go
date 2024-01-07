@@ -110,6 +110,14 @@ SELECT * FROM_TABLE;
 			},
 		},
 		{
+			filePath:   "undefined_type.go",
+			goldenFile: "undefined_type_golden.go",
+			want: &FormatResult{
+				Changed: true,
+				Errors:  []*FormatError{},
+			},
+		},
+		{
 			filePath:   "no_sql.go",
 			goldenFile: "",
 			want: &FormatResult{

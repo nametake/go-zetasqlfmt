@@ -56,7 +56,7 @@ type FormatResult struct {
 
 func Format(path string) (*FormatResult, error) {
 	cfg := &packages.Config{
-		Mode: packages.NeedTypes + packages.NeedSyntax + packages.NeedTypesInfo,
+		Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
 	}
 
 	pkgs, err := packages.Load(cfg, path)
