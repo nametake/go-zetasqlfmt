@@ -83,6 +83,24 @@ SELECT * FROM_TABLE;
 			},
 		},
 		{
+			filePath:   "include_invalid_sql.go",
+			goldenFile: "include_invalid_sql_golden.go",
+			want: &FormatResult{
+				Changed: true,
+				Errors: []*FormatError{
+					{
+						Message: `INVALID_ARGUMENT: Syntax error: Expected end of input but got identifier "FROM_TABLE" [at 1:10]
+SELECT * FROM_TABLE;
+         ^
+Syntax error: Unexpected end of statement [at 1:21]
+SELECT * FROM_TABLE;
+                    ^`,
+						PosText: "include_invalid_sql.go:9:11",
+					},
+				},
+			},
+		},
+		{
 			filePath:   "no_sql.go",
 			goldenFile: "",
 			want: &FormatResult{
