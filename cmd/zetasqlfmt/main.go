@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"go/ast"
 	"os"
 	"sync"
 
 	"github.com/nametake/go-zetasqlfmt"
+	"golang.org/x/tools/go/packages"
 )
 
 func init() {
@@ -35,13 +37,23 @@ func main() {
 }
 
 func run(dir string) error {
-	errMsgCh := make(chan *zetasqlfmt.FormatError)
-	waitGroup := &sync.WaitGroup{}
+	waitGroup := sync.WaitGroup{}
 
-	fn := func(path string, ch chan *zetasqlfmt.FormatError, wg *sync.WaitGroup) {
-		defer wg.Done()
+	cfg := &packages.Config{
+		Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedFiles,
+	}
+	pkgs, err := packages.Load(cfg, dir)
+	if err != nil {
+		return fmt.Errorf("failed to load packages: path = %s: %v", dir, err)
+	}
 
-		result, err := zetasqlfmt.Format(path)
+	errCount := 0
+	format := func(pkg *packages.Package, file *ast.File, wg *sync.WaitGroup) {
+		defer func() {
+			wg.Done()
+		}()
+
+		result, err := zetasqlfmt.Format(pkg, file)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
@@ -49,38 +61,31 @@ func run(dir string) error {
 
 		if len(result.Errors) > 0 {
 			for _, err := range result.Errors {
-				ch <- err
+				errCount += 1
+				fmt.Fprintf(os.Stderr, "%v\n", err)
 			}
 		}
 		if !result.Changed {
 			return
 		}
 
-		if err := os.WriteFile(path, result.Output, 0644); err != nil {
+		if err := os.WriteFile(result.Path, result.Output, 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
 		}
 	}
 
-	if err := zetasqlfmt.FindGoFiles(dir, func(path string) {
-		waitGroup.Add(1)
-		go fn(path, errMsgCh, waitGroup)
-	}); err != nil {
-		return fmt.Errorf("failed to find go files: %v", err)
-	}
-
-	count := 0
-	go func() {
-		if err := <-errMsgCh; err != nil {
-			count += 1
-			fmt.Fprintf(os.Stderr, "%v\n", err)
+	for _, pkg := range pkgs {
+		for _, file := range pkg.Syntax {
+			waitGroup.Add(1)
+			go format(pkg, file, &waitGroup)
 		}
-	}()
+	}
 
 	waitGroup.Wait()
-	close(errMsgCh)
 
-	if count > 0 {
-		return fmt.Errorf("failed to format %d files", count)
+	if errCount > 0 {
+		return fmt.Errorf("failed to format %d files", errCount)
 	}
 
 	return nil

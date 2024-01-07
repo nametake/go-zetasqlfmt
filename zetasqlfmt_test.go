@@ -1,31 +1,40 @@
 package zetasqlfmt
 
 import (
+	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/tools/go/packages"
 )
 
-func TestFindGoFiles(t *testing.T) {
-	expected := []string{
-		"testdata/files/dir/file1.go",
-		"testdata/files/file1.go",
-		"testdata/files/file2.go",
+func TestSample(t *testing.T) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+	if err := os.Chdir("testdata"); err != nil {
+		t.Fatalf("failed to change directory to testdata: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(currentDir); err != nil {
+			t.Fatalf("failed to change directory to %q: %v", currentDir, err)
+		}
+	})
+
+	cfg := &packages.Config{
+		Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedFiles,
 	}
 
-	actuals := make([]string, 0)
-	fn := func(path string) {
-		actuals = append(actuals, path)
+	pkgs, err := packages.Load(cfg, "./...")
+	if err != nil {
+		t.Fatalf("failed to load packages: %v", err)
 	}
+	fmt.Println(pkgs)
 
-	if err := FindGoFiles("testdata/files", fn); err != nil {
-		t.Fatalf("findGoFiles(%q) returned unexpected error: %v", "testdata", err)
-	}
-
-	if diff := cmp.Diff(expected, actuals); diff != "" {
-		t.Errorf("FindGoFiles(%q) returned unexpected files (-want +got):\n%s", "testdata", diff)
+	for _, pkg := range pkgs {
+		fmt.Println(pkg.GoFiles)
 	}
 }
 
@@ -44,6 +53,15 @@ func TestFormat(t *testing.T) {
 		}
 	})
 
+	testdataDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get current directory: %v", err)
+	}
+
+	addDirPrefix := func(s string) string {
+		return fmt.Sprintf("%s/%s", testdataDir, s)
+	}
+
 	tests := []struct {
 		filePath   string
 		goldenFile string
@@ -53,6 +71,7 @@ func TestFormat(t *testing.T) {
 			filePath:   "simple.go",
 			goldenFile: "simple_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("simple.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -61,6 +80,7 @@ func TestFormat(t *testing.T) {
 			filePath:   "sprintf.go",
 			goldenFile: "sprintf_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("sprintf.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -69,6 +89,7 @@ func TestFormat(t *testing.T) {
 			filePath:   "backquote.go",
 			goldenFile: "backquote_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("backquote.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -77,6 +98,7 @@ func TestFormat(t *testing.T) {
 			filePath:   "invalid_sql.go",
 			goldenFile: "",
 			want: &FormatResult{
+				Path:    addDirPrefix("invalid_sql.go"),
 				Changed: false,
 				Errors: []*FormatError{
 					{
@@ -86,7 +108,7 @@ SELECT * FROM_TABLE;
 Syntax error: Unexpected end of statement [at 1:21]
 SELECT * FROM_TABLE;
                     ^`,
-						PosText: "invalid_sql.go:9:11",
+						PosText: addDirPrefix("invalid_sql.go:9:11"),
 					},
 				},
 			},
@@ -95,6 +117,7 @@ SELECT * FROM_TABLE;
 			filePath:   "include_invalid_sql.go",
 			goldenFile: "include_invalid_sql_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("include_invalid_sql.go"),
 				Changed: true,
 				Errors: []*FormatError{
 					{
@@ -104,7 +127,7 @@ SELECT * FROM_TABLE;
 Syntax error: Unexpected end of statement [at 1:21]
 SELECT * FROM_TABLE;
                     ^`,
-						PosText: "include_invalid_sql.go:9:11",
+						PosText: addDirPrefix("include_invalid_sql.go:9:11"),
 					},
 				},
 			},
@@ -113,6 +136,7 @@ SELECT * FROM_TABLE;
 			filePath:   "undefined_type.go",
 			goldenFile: "undefined_type_golden.go",
 			want: &FormatResult{
+				Path:    addDirPrefix("undefined_type.go"),
 				Changed: true,
 				Errors:  []*FormatError{},
 			},
@@ -121,18 +145,12 @@ SELECT * FROM_TABLE;
 			filePath:   "no_sql.go",
 			goldenFile: "",
 			want: &FormatResult{
+				Path:    addDirPrefix("no_sql.go"),
 				Changed: false,
 				Errors:  []*FormatError{},
 			},
 		},
 	}
-
-	opt := cmp.Comparer(func(x, y *FormatError) bool {
-		if len(x.PosText) < len(y.PosText) {
-			return x.Message == y.Message && strings.HasSuffix(y.PosText, x.PosText)
-		}
-		return x.Message == y.Message && strings.HasSuffix(x.PosText, y.PosText)
-	})
 
 	for _, test := range tests {
 		if test.want.Changed {
@@ -143,13 +161,32 @@ SELECT * FROM_TABLE;
 			test.want.Output = golden
 		}
 
-		got, err := Format(test.filePath)
+		cfg := &packages.Config{
+			Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo | packages.NeedFiles,
+		}
+		pkgs, err := packages.Load(cfg, test.filePath)
+		if err != nil {
+			t.Errorf("failed to load packages: path = %s: %v", test.filePath, err)
+		}
+		if len(pkgs) != 1 {
+			t.Errorf("expected exactly one package: %s", test.filePath)
+		}
+
+		pkg := pkgs[0]
+
+		if len(pkg.Syntax) != 1 {
+			t.Errorf("expected exactly one file: %s", test.filePath)
+		}
+
+		file := pkg.Syntax[0]
+
+		got, err := Format(pkg, file)
 		if err != nil {
 			t.Errorf("Format(%q) returned unexpected error: %v", test.filePath, err)
 			continue
 		}
 
-		if diff := cmp.Diff(test.want, got, opt); diff != "" {
+		if diff := cmp.Diff(test.want, got); diff != "" {
 			t.Errorf("Format(%q) returned unexpected result (-want +got):\n%s", test.filePath, diff)
 		}
 	}

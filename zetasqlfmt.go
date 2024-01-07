@@ -6,38 +6,12 @@ import (
 	"go/ast"
 	"go/format"
 	"go/printer"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/goccy/go-zetasql"
 	"golang.org/x/tools/go/packages"
 )
-
-func FindGoFiles(directory string, fn func(path string)) error {
-	if err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			switch info.Name() {
-			case "testdata", "vendor":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if filepath.Ext(path) != ".go" {
-			return nil
-		}
-		if strings.HasSuffix(path, "_gen.go") {
-			return nil
-		}
-		fn(path)
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to walk directory %s: %v", directory, err)
-	}
-
-	return nil
-}
 
 type FormatError struct {
 	Message string
@@ -49,44 +23,14 @@ func (e *FormatError) String() string {
 }
 
 type FormatResult struct {
+	Path    string
 	Output  []byte
 	Errors  []*FormatError
 	Changed bool
 }
 
-func Format(path string) (*FormatResult, error) {
-	cfg := &packages.Config{
-		Mode: packages.NeedTypes | packages.NeedSyntax | packages.NeedTypesInfo,
-	}
-
-	pkgs, err := packages.Load(cfg, path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load packages: path = %s: %v", path, err)
-	}
-	// NOTE If the package has syntax errors, it will be ignored.
-	// if packages.PrintErrors(pkgs) > 0 {
-	// 	return nil, fmt.Errorf("failed to load packages: path = %s: %v", path, err)
-	// }
-	if len(pkgs) != 1 {
-		return nil, fmt.Errorf("expected exactly one package: %s", path)
-	}
-
-	pkg := pkgs[0]
-
-	if len(pkg.Syntax) != 1 {
-		// for test.go file
-		if len(pkg.Syntax) == 0 {
-			return &FormatResult{
-				Output:  []byte{},
-				Errors:  []*FormatError{},
-				Changed: false,
-			}, nil
-		}
-		return nil, fmt.Errorf("expected exactly one file: %s", path)
-	}
-
-	file := pkg.Syntax[0]
-
+func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
+	path := pkg.Fset.Position(file.Pos()).Filename
 	basicLitExprs := make([]*ast.BasicLit, 0)
 	ast.Inspect(file, func(n ast.Node) bool {
 		compositeLit, ok := n.(*ast.CompositeLit)
@@ -156,6 +100,7 @@ func Format(path string) (*FormatResult, error) {
 	errors := make([]*FormatError, 0, len(basicLitExprs))
 	if len(basicLitExprs) == 0 {
 		return &FormatResult{
+			Path:    path,
 			Output:  nil,
 			Errors:  errors,
 			Changed: false,
@@ -181,6 +126,7 @@ func Format(path string) (*FormatResult, error) {
 
 	if len(errors) == len(basicLitExprs) {
 		return &FormatResult{
+			Path:    path,
 			Output:  nil,
 			Errors:  errors,
 			Changed: false,
@@ -189,21 +135,21 @@ func Format(path string) (*FormatResult, error) {
 
 	var buf bytes.Buffer
 	if err := printer.Fprint(&buf, pkg.Fset, file); err != nil {
-		return nil, fmt.Errorf("%s: failed to print AST: %v", path, err)
+		return nil, fmt.Errorf("%s: failed to print AST: %v", pkg.Fset.Position(file.Pos()), err)
 	}
 
 	result, err := format.Source(buf.Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("%s: failed to format source: %v", path, err)
+		return nil, fmt.Errorf("%s: failed to format source: %v", pkg.Fset.Position(file.Pos()), err)
 	}
 
 	return &FormatResult{
+		Path:    path,
 		Output:  result,
 		Errors:  errors,
 		Changed: true,
 	}, nil
 }
-
 func trimQuotes(s string) string {
 	if len(s) < 2 {
 		return s
