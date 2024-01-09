@@ -36,11 +36,13 @@ func TestFormat(t *testing.T) {
 	tests := []struct {
 		filePath   string
 		goldenFile string
+		option     *Option
 		want       *FormatResult
 	}{
 		{
 			filePath:   "simple.go",
 			goldenFile: "simple_golden.go",
+			option:     &Option{NoSemicolon: false},
 			want: &FormatResult{
 				Path:    addDirPrefix("simple.go"),
 				Changed: true,
@@ -50,6 +52,7 @@ func TestFormat(t *testing.T) {
 		{
 			filePath:   "sprintf.go",
 			goldenFile: "sprintf_golden.go",
+			option:     &Option{NoSemicolon: false},
 			want: &FormatResult{
 				Path:    addDirPrefix("sprintf.go"),
 				Changed: true,
@@ -59,6 +62,7 @@ func TestFormat(t *testing.T) {
 		{
 			filePath:   "backquote.go",
 			goldenFile: "backquote_golden.go",
+			option:     &Option{NoSemicolon: false},
 			want: &FormatResult{
 				Path:    addDirPrefix("backquote.go"),
 				Changed: true,
@@ -66,8 +70,19 @@ func TestFormat(t *testing.T) {
 			},
 		},
 		{
+			filePath:   "nosemicolon.go",
+			goldenFile: "nosemicolon_golden.go",
+			option:     &Option{NoSemicolon: true},
+			want: &FormatResult{
+				Path:    addDirPrefix("nosemicolon.go"),
+				Changed: true,
+				Errors:  []*FormatError{},
+			},
+		},
+		{
 			filePath:   "invalid_sql.go",
 			goldenFile: "",
+			option:     &Option{NoSemicolon: false},
 			want: &FormatResult{
 				Path:    addDirPrefix("invalid_sql.go"),
 				Changed: false,
@@ -87,6 +102,7 @@ SELECT * FROM_TABLE;
 		{
 			filePath:   "include_invalid_sql.go",
 			goldenFile: "include_invalid_sql_golden.go",
+			option:     &Option{NoSemicolon: false},
 			want: &FormatResult{
 				Path:    addDirPrefix("include_invalid_sql.go"),
 				Changed: true,
@@ -106,6 +122,7 @@ SELECT * FROM_TABLE;
 		{
 			filePath:   "undefined_type.go",
 			goldenFile: "undefined_type_golden.go",
+			option:     &Option{NoSemicolon: false},
 			want: &FormatResult{
 				Path:    addDirPrefix("undefined_type.go"),
 				Changed: true,
@@ -115,6 +132,7 @@ SELECT * FROM_TABLE;
 		{
 			filePath:   "no_sql.go",
 			goldenFile: "",
+			option:     &Option{NoSemicolon: false},
 			want: &FormatResult{
 				Path:    addDirPrefix("no_sql.go"),
 				Changed: false,
@@ -151,7 +169,7 @@ SELECT * FROM_TABLE;
 
 		file := pkg.Syntax[0]
 
-		got, err := Format(pkg, file)
+		got, err := Format(pkg, file, test.option)
 		if err != nil {
 			t.Errorf("Format(%q) returned unexpected error: %v", test.filePath, err)
 			continue

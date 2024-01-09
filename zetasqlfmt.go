@@ -29,7 +29,11 @@ type FormatResult struct {
 	Changed bool
 }
 
-func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
+type Option struct {
+	NoSemicolon bool
+}
+
+func Format(pkg *packages.Package, file *ast.File, option *Option) (*FormatResult, error) {
 	path := pkg.Fset.Position(file.Pos()).Filename
 	basicLitExprs := make([]*ast.BasicLit, 0)
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -121,6 +125,9 @@ func Format(pkg *packages.Package, file *ast.File) (*FormatResult, error) {
 		}
 
 		output = restoreFormatVerbs(output)
+		if option != nil && option.NoSemicolon {
+			output = trimEndSemicolon(output)
+		}
 		basicLitExpr.Value = wrapQuotes(output)
 	}
 
@@ -206,4 +213,8 @@ func removeNewlines(input string) string {
 	result = strings.ReplaceAll(result, "\n", " ")
 	result = strings.TrimSpace(result)
 	return result
+}
+
+func trimEndSemicolon(s string) string {
+	return strings.TrimSuffix(s, ";")
 }

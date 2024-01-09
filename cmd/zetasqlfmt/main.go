@@ -20,6 +20,7 @@ func init() {
 }
 
 func main() {
+	nosemicolon := flag.Bool("nosemicolon", false, "no semicolon")
 	flag.Parse()
 
 	args := flag.Args()
@@ -30,13 +31,17 @@ func main() {
 	}
 	dir := args[0]
 
-	if err := run(dir); err != nil {
+	option := &zetasqlfmt.Option{
+		NoSemicolon: *nosemicolon,
+	}
+
+	if err := run(dir, option); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(dir string) error {
+func run(dir string, option *zetasqlfmt.Option) error {
 	waitGroup := sync.WaitGroup{}
 
 	cfg := &packages.Config{
@@ -53,7 +58,7 @@ func run(dir string) error {
 			wg.Done()
 		}()
 
-		result, err := zetasqlfmt.Format(pkg, file)
+		result, err := zetasqlfmt.Format(pkg, file, option)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
