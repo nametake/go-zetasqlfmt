@@ -120,6 +120,16 @@ SELECT * FROM_TABLE;
 			},
 		},
 		{
+			filePath:   "functions.go",
+			goldenFile: "functions_golden.go",
+			option:     &Option{NoSemicolon: false},
+			want: &FormatResult{
+				Path:    addDirPrefix("functions.go"),
+				Changed: true,
+				Errors:  []*FormatError{},
+			},
+		},
+		{
 			filePath:   "undefined_type.go",
 			goldenFile: "undefined_type_golden.go",
 			option:     &Option{NoSemicolon: false},
