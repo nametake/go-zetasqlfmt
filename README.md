@@ -114,3 +114,7 @@ The conversion table is as follows:
 
 The replaced dummy values are then converted back to the original format verbs after formatting.
 Therefore, if the original SQL contains strings from the conversion table, unintended behavior may occur.
+
+### Links
+
+- [go-zetasqlfmt-action](https://github.com/nametake/go-zetasqlfmt-action)
