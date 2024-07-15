@@ -1,4 +1,4 @@
-FROM golang:1.21-bookworm
+FROM golang:1.22-bookworm as builder
 
 ARG VERSION
 
@@ -12,8 +12,17 @@ ENV CXX clang++
 
 WORKDIR /go-zetasqlfmt
 
-RUN go install github.com/nametake/go-zetasqlfmt/cmd/zetasqlfmt@latest
+COPY go.mod go.sum ./
+RUN go mod download
 
-COPY entrypoint.sh /entrypoint.sh
+COPY . .
 
-ENTRYPOINT ["/entrypoint.sh"]
+RUN go install ./cmd/zetasqlfmt
+
+FROM golang:1.22-bookworm
+
+WORKDIR /app
+
+COPY --from=builder /go/bin/zetasqlfmt /bin/zetasqlfmt
+
+ENTRYPOINT ["/bin/zetasqlfmt"]
