@@ -16,6 +16,12 @@ If you don't want to see warning logs, you can suppress them by specifying CXXFL
 CGO_CXXFLAGS="$(go env CGO_CXXFLAGS) -Wno-deprecated" go install github.com/nametake/go-zetasqlfmt/cmd/zetasqlfmt@latest
 ```
 
+If you use Docker, you can use the following commands without installing zetasqlfmt:
+
+```console
+docker run --rm -v ".:/app" ghcr.io/nametake/go-zetasqlfmt:main ./...
+```
+
 ## Usage
 
 You can format ZetaSQL by running the command within a project containing `cloud.google.com/go/spanner.Statement`.
@@ -62,6 +68,13 @@ FROM
 `, Params: map[string]interface{}{},
 	}
 }
+```
+
+## Options
+
+```console
+-nosemicolon
+      no semicolon
 ```
 
 ## Formatting Specifications
